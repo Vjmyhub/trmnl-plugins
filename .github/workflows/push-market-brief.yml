@@ -40,6 +40,43 @@ jobs:
           echo "change=$CHANGE" >> "$GITHUB_OUTPUT"
           echo "dir=$DIR" >> "$GITHUB_OUTPUT"
 
+      - name: Fetch market news headlines
+        id: news
+        run: |
+          python3 <<'PY' > headlines.json
+          import json
+          import urllib.request
+          import xml.etree.ElementTree as ET
+
+          feeds = [
+              "https://feeds.marketwatch.com/marketwatch/topstories/",
+              "https://finance.yahoo.com/news/rssindex",
+              "https://www.cnbc.com/id/20910258/device/rss/rss.html",
+          ]
+
+          headlines = []
+          for url in feeds:
+              try:
+                  req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                  with urllib.request.urlopen(req, timeout=10) as resp:
+                      data = resp.read()
+                  root = ET.fromstring(data)
+                  for item in root.iter("item"):
+                      title_el = item.find("title")
+                      if title_el is not None and title_el.text:
+                          title = title_el.text.strip()
+                          if title and title not in headlines:
+                              headlines.append(title)
+              except Exception:
+                  continue
+
+          print(json.dumps(headlines[:10]))
+          PY
+
+          echo "headlines<<EOF" >> "$GITHUB_OUTPUT"
+          cat headlines.json >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
       - name: Generate brief + reason with GitHub Models
         id: ai
         env:
@@ -50,9 +87,16 @@ jobs:
           JPM_PRICE: ${{ steps.jpm.outputs.price }}
           JPM_CHANGE: ${{ steps.jpm.outputs.change }}
           JPM_DIR: ${{ steps.jpm.outputs.dir }}
+          HEADLINES: ${{ steps.news.outputs.headlines }}
         run: |
-          PROMPT="Today the S&P 500 closed at $SP_PRICE, $SP_DIR $SP_CHANGE% from the previous close. JPMorgan (JPM) closed at $JPM_PRICE, $JPM_DIR $JPM_CHANGE%. Write:
-          1. A one-sentence plausible, specific reason the market moved this way today (sector drivers, rates, earnings, macro data — general financial reasoning, not real-time news).
+          HEADLINES_TEXT=$(echo "$HEADLINES" | jq -r 'if length > 0 then join("; ") else "" end')
+
+          PROMPT="Today the S&P 500 closed at $SP_PRICE, $SP_DIR $SP_CHANGE% from the previous close. JPMorgan (JPM) closed at $JPM_PRICE, $JPM_DIR $JPM_CHANGE%.
+
+          Today's financial news headlines: $HEADLINES_TEXT
+
+          Write:
+          1. A one-sentence reason the market moved this way today, grounded in the most relevant headline(s) above. If none of the headlines are clearly relevant, give a brief plausible general explanation instead and don't reference a headline.
           2. A separate one-sentence general daily brief/context line (not about the market).
           Respond in JSON only: {\"reason\": \"...\", \"brief\": \"...\"}"
 

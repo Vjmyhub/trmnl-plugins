@@ -5,7 +5,7 @@ Your daily briefing on one e-ink display: a short AI-written note, S&P 500 statu
 ## How it works
 
 ```
-GitHub Action (scheduled) → fetches S&P 500 + JPM quotes → AI writes reason + brief → POSTs to TRMNL webhook → your e-ink display
+GitHub Action (scheduled) → fetches S&P 500 + JPM quotes + real news headlines → AI writes reason + brief → POSTs to TRMNL webhook → your e-ink display
 ```
 
 No server needed — it runs entirely on GitHub Actions using free GitHub Models (no external API key required).
@@ -41,19 +41,29 @@ The Action runs weekdays at 21:30 UTC (shortly after the 4:00pm ET US market clo
 ## What it shows
 
 - A short AI-written daily brief line
-- S&P 500: price, % change, direction, and a one-sentence AI-generated reason for the move
+- S&P 500: price, % change, direction, and a one-sentence reason for the move — grounded in real headlines from the day's financial news
 - JPMorgan (JPM): price, % change, direction
+
+## News sources
+
+Headlines are pulled from free, no-key-required RSS feeds:
+- MarketWatch Top Stories
+- Yahoo Finance News
+- CNBC Markets
+
+The AI step is given these headlines and asked to pick the most relevant one(s) to explain the day's move. If none of the pulled headlines are relevant, it falls back to a brief general explanation instead of forcing a connection.
 
 ## Customization
 
 Edit `.github/workflows/push-market-brief.yml` to change:
 - **Schedule**: modify the cron expression (`30 21 * * 1-5`)
 - **Tickers**: change `%5EGSPC` (S&P 500) or `JPM` in the Yahoo Finance URLs to track other indices/stocks
+- **News sources**: edit the `feeds` list in the "Fetch market news headlines" step
 - **AI model**: the "Generate brief + reason" step uses GitHub Models (`gpt-4o`) with your repo's built-in `GITHUB_TOKEN` — swap in the Claude/Anthropic API instead if you'd prefer (requires adding an `ANTHROPIC_API_KEY` secret)
 
 ## A note on the "reason"
 
-The reason for the market's move is AI-generated financial reasoning based on the day's price data, not a live news lookup — treat it as a plausible explanation, not a sourced fact.
+The reason is AI-summarized from real headlines pulled at run time, not independently fact-checked — treat it as a best-effort explanation grounded in the day's news, not a verified analysis.
 
 ## License
 
