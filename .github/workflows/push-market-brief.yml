@@ -16,12 +16,22 @@ jobs:
       - name: Fetch S&P 500 quote
         id: sp500
         run: |
+          set +e
           RESPONSE=$(curl -s -H "User-Agent: Mozilla/5.0" \
             "https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?interval=1d&range=1d")
-          PRICE=$(echo "$RESPONSE" | jq -r '.chart.result[0].meta.regularMarketPrice')
-          PREV=$(echo "$RESPONSE" | jq -r '.chart.result[0].meta.chartPreviousClose')
-          CHANGE=$(awk -v p="$PRICE" -v prev="$PREV" 'BEGIN{printf "%+.2f", ((p-prev)/prev)*100}')
-          DIR=$(awk -v p="$PRICE" -v prev="$PREV" 'BEGIN{ if (p>prev) print "up"; else if (p<prev) print "down"; else print "flat" }')
+          PRICE=$(echo "$RESPONSE" | jq -r '.chart.result[0].meta.regularMarketPrice // empty' 2>/dev/null)
+          PREV=$(echo "$RESPONSE" | jq -r '.chart.result[0].meta.chartPreviousClose // empty' 2>/dev/null)
+
+          if [ -z "$PRICE" ] || [ -z "$PREV" ]; then
+            echo "::warning::Failed to fetch S&P 500 quote — using fallback values"
+            PRICE="N/A"
+            CHANGE="0.00"
+            DIR="flat"
+          else
+            CHANGE=$(awk -v p="$PRICE" -v prev="$PREV" 'BEGIN{printf "%+.2f", ((p-prev)/prev)*100}')
+            DIR=$(awk -v p="$PRICE" -v prev="$PREV" 'BEGIN{ if (p>prev) print "up"; else if (p<prev) print "down"; else print "flat" }')
+          fi
+
           echo "price=$PRICE" >> "$GITHUB_OUTPUT"
           echo "prev=$PREV" >> "$GITHUB_OUTPUT"
           echo "change=$CHANGE" >> "$GITHUB_OUTPUT"
@@ -30,12 +40,22 @@ jobs:
       - name: Fetch JPM quote
         id: jpm
         run: |
+          set +e
           RESPONSE=$(curl -s -H "User-Agent: Mozilla/5.0" \
             "https://query1.finance.yahoo.com/v8/finance/chart/JPM?interval=1d&range=1d")
-          PRICE=$(echo "$RESPONSE" | jq -r '.chart.result[0].meta.regularMarketPrice')
-          PREV=$(echo "$RESPONSE" | jq -r '.chart.result[0].meta.chartPreviousClose')
-          CHANGE=$(awk -v p="$PRICE" -v prev="$PREV" 'BEGIN{printf "%+.2f", ((p-prev)/prev)*100}')
-          DIR=$(awk -v p="$PRICE" -v prev="$PREV" 'BEGIN{ if (p>prev) print "up"; else if (p<prev) print "down"; else print "flat" }')
+          PRICE=$(echo "$RESPONSE" | jq -r '.chart.result[0].meta.regularMarketPrice // empty' 2>/dev/null)
+          PREV=$(echo "$RESPONSE" | jq -r '.chart.result[0].meta.chartPreviousClose // empty' 2>/dev/null)
+
+          if [ -z "$PRICE" ] || [ -z "$PREV" ]; then
+            echo "::warning::Failed to fetch JPM quote — using fallback values"
+            PRICE="N/A"
+            CHANGE="0.00"
+            DIR="flat"
+          else
+            CHANGE=$(awk -v p="$PRICE" -v prev="$PREV" 'BEGIN{printf "%+.2f", ((p-prev)/prev)*100}')
+            DIR=$(awk -v p="$PRICE" -v prev="$PREV" 'BEGIN{ if (p>prev) print "up"; else if (p<prev) print "down"; else print "flat" }')
+          fi
+
           echo "price=$PRICE" >> "$GITHUB_OUTPUT"
           echo "change=$CHANGE" >> "$GITHUB_OUTPUT"
           echo "dir=$DIR" >> "$GITHUB_OUTPUT"
@@ -105,12 +125,26 @@ jobs:
             "model": "gpt-4o"
           }')
 
+          set +e
           RESPONSE=$(curl -s https://models.inference.ai.azure.com/chat/completions \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Content-Type: application/json" \
             -d "$PAYLOAD")
 
-          CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content' | sed 's/```json//g; s/```//g' | jq -c '.')
+          RAW_CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // empty' 2>/dev/null)
+          CONTENT="{}"
+          if [ -n "$RAW_CONTENT" ]; then
+            CLEANED=$(echo "$RAW_CONTENT" | sed 's/```json//g; s/```//g')
+            PARSED=$(echo "$CLEANED" | jq -c '.' 2>/dev/null)
+            if [ -n "$PARSED" ] && [ "$PARSED" != "null" ]; then
+              CONTENT="$PARSED"
+            fi
+          fi
+
+          if [ "$CONTENT" = "{}" ]; then
+            echo "::warning::GitHub Models did not return usable content — falling back to placeholder reason/brief"
+          fi
+
           echo "content<<EOF" >> "$GITHUB_OUTPUT"
           echo "$CONTENT" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
@@ -125,9 +159,18 @@ jobs:
           JPM_CHANGE: ${{ steps.jpm.outputs.change }}
           JPM_DIR: ${{ steps.jpm.outputs.dir }}
         run: |
+          set +e
           CONTENT='${{ steps.ai.outputs.content }}'
-          REASON=$(echo "$CONTENT" | jq -r '.reason')
-          BRIEF=$(echo "$CONTENT" | jq -r '.brief')
+          REASON=$(echo "$CONTENT" | jq -r '.reason // empty' 2>/dev/null)
+          BRIEF=$(echo "$CONTENT" | jq -r '.brief // empty' 2>/dev/null)
+
+          if [ -z "$REASON" ]; then
+            REASON="Reason unavailable today — check the Action logs."
+          fi
+          if [ -z "$BRIEF" ]; then
+            BRIEF="Daily brief unavailable today."
+          fi
+
           DATE=$(date -u '+%b %d, %Y')
 
           PAYLOAD=$(jq -n \
@@ -153,7 +196,13 @@ jobs:
               jpm_direction: $jpm_dir
             }}')
 
-          curl -s -X POST "$TRMNL_WEBHOOK_URL" \
+          HTTP_STATUS=$(curl -s -o /tmp/trmnl-response.txt -w "%{http_code}" -X POST "$TRMNL_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD"
-          echo "Done!"
+            -d "$PAYLOAD")
+
+          cat /tmp/trmnl-response.txt
+          if [ "$HTTP_STATUS" -lt 200 ] || [ "$HTTP_STATUS" -ge 300 ]; then
+            echo "::error::TRMNL webhook returned HTTP $HTTP_STATUS"
+            exit 1
+          fi
+          echo "Done! (HTTP $HTTP_STATUS)"
