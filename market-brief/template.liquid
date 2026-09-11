@@ -1,0 +1,49 @@
+<div style="font-family: sans-serif; padding: 24px 28px; background: #fff; color: #000; height: 480px; width: 800px; position: relative; overflow: hidden;">
+
+  <!-- Header -->
+  <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; border-bottom: 3px solid #000; padding-bottom: 12px;">
+    <div style="font-size: 26px; font-weight: 800; letter-spacing: -0.5px;">📈 Daily Brief</div>
+    <div style="font-size: 11px; color: #666;">{{ date }}</div>
+  </div>
+
+  <!-- Brief message -->
+  <div style="font-size: 14px; line-height: 1.5; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px dashed #ccc;">
+    {{ brief }}
+  </div>
+
+  <!-- Market row -->
+  <div style="display: flex; gap: 20px;">
+
+    <!-- S&P 500 -->
+    <div style="flex: 1; border: 2px solid #000; padding: 14px 16px;">
+      <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #666; margin-bottom: 6px;">
+        {{ market_index_name | default: "S&P 500" }}
+      </div>
+      <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px;">
+        <div style="font-size: 26px; font-weight: 800;">{{ market_price }}</div>
+        <div style="font-size: 15px; font-weight: 700;">
+          {% if market_direction == "up" %}▲{% elsif market_direction == "down" %}▼{% else %}▪{% endif %}
+          {{ market_change_pct }}%
+        </div>
+      </div>
+      <div style="font-size: 12px; line-height: 1.4; color: #333;">
+        {{ market_reason }}
+      </div>
+    </div>
+
+    <!-- JPM -->
+    <div style="width: 220px; border: 2px solid #000; padding: 14px 16px;">
+      <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #666; margin-bottom: 6px;">
+        JPMorgan (JPM)
+      </div>
+      <div style="display: flex; align-items: baseline; gap: 8px;">
+        <div style="font-size: 22px; font-weight: 800;">{{ jpm_price }}</div>
+        <div style="font-size: 13px; font-weight: 700;">
+          {% if jpm_direction == "up" %}▲{% elsif jpm_direction == "down" %}▼{% else %}▪{% endif %}
+          {{ jpm_change_pct }}%
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>

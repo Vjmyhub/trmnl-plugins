@@ -1,0 +1,115 @@
+name: Market Brief — Daily Push
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 21:30 UTC, Mon-Fri — after US market close (4:00pm ET)
+    - cron: '30 21 * * 1-5'
+
+jobs:
+  push-market-brief:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      models: read
+    steps:
+      - name: Fetch S&P 500 quote
+        id: sp500
+        run: |
+          RESPONSE=$(curl -s -H "User-Agent: Mozilla/5.0" \
+            "https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?interval=1d&range=1d")
+          PRICE=$(echo "$RESPONSE" | jq -r '.chart.result[0].meta.regularMarketPrice')
+          PREV=$(echo "$RESPONSE" | jq -r '.chart.result[0].meta.chartPreviousClose')
+          CHANGE=$(awk -v p="$PRICE" -v prev="$PREV" 'BEGIN{printf "%+.2f", ((p-prev)/prev)*100}')
+          DIR=$(awk -v p="$PRICE" -v prev="$PREV" 'BEGIN{ if (p>prev) print "up"; else if (p<prev) print "down"; else print "flat" }')
+          echo "price=$PRICE" >> "$GITHUB_OUTPUT"
+          echo "prev=$PREV" >> "$GITHUB_OUTPUT"
+          echo "change=$CHANGE" >> "$GITHUB_OUTPUT"
+          echo "dir=$DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch JPM quote
+        id: jpm
+        run: |
+          RESPONSE=$(curl -s -H "User-Agent: Mozilla/5.0" \
+            "https://query1.finance.yahoo.com/v8/finance/chart/JPM?interval=1d&range=1d")
+          PRICE=$(echo "$RESPONSE" | jq -r '.chart.result[0].meta.regularMarketPrice')
+          PREV=$(echo "$RESPONSE" | jq -r '.chart.result[0].meta.chartPreviousClose')
+          CHANGE=$(awk -v p="$PRICE" -v prev="$PREV" 'BEGIN{printf "%+.2f", ((p-prev)/prev)*100}')
+          DIR=$(awk -v p="$PRICE" -v prev="$PREV" 'BEGIN{ if (p>prev) print "up"; else if (p<prev) print "down"; else print "flat" }')
+          echo "price=$PRICE" >> "$GITHUB_OUTPUT"
+          echo "change=$CHANGE" >> "$GITHUB_OUTPUT"
+          echo "dir=$DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Generate brief + reason with GitHub Models
+        id: ai
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SP_PRICE: ${{ steps.sp500.outputs.price }}
+          SP_CHANGE: ${{ steps.sp500.outputs.change }}
+          SP_DIR: ${{ steps.sp500.outputs.dir }}
+          JPM_PRICE: ${{ steps.jpm.outputs.price }}
+          JPM_CHANGE: ${{ steps.jpm.outputs.change }}
+          JPM_DIR: ${{ steps.jpm.outputs.dir }}
+        run: |
+          PROMPT="Today the S&P 500 closed at $SP_PRICE, $SP_DIR $SP_CHANGE% from the previous close. JPMorgan (JPM) closed at $JPM_PRICE, $JPM_DIR $JPM_CHANGE%. Write:
+          1. A one-sentence plausible, specific reason the market moved this way today (sector drivers, rates, earnings, macro data — general financial reasoning, not real-time news).
+          2. A separate one-sentence general daily brief/context line (not about the market).
+          Respond in JSON only: {\"reason\": \"...\", \"brief\": \"...\"}"
+
+          PAYLOAD=$(jq -n --arg prompt "$PROMPT" '{
+            "messages": [{"role": "user", "content": $prompt}],
+            "model": "gpt-4o"
+          }')
+
+          RESPONSE=$(curl -s https://models.inference.ai.azure.com/chat/completions \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD")
+
+          CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content' | sed 's/```json//g; s/```//g' | jq -c '.')
+          echo "content<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$CONTENT" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Push to TRMNL
+        env:
+          TRMNL_WEBHOOK_URL: ${{ secrets.MARKET_BRIEF_WEBHOOK_URL }}
+          SP_PRICE: ${{ steps.sp500.outputs.price }}
+          SP_CHANGE: ${{ steps.sp500.outputs.change }}
+          SP_DIR: ${{ steps.sp500.outputs.dir }}
+          JPM_PRICE: ${{ steps.jpm.outputs.price }}
+          JPM_CHANGE: ${{ steps.jpm.outputs.change }}
+          JPM_DIR: ${{ steps.jpm.outputs.dir }}
+        run: |
+          CONTENT='${{ steps.ai.outputs.content }}'
+          REASON=$(echo "$CONTENT" | jq -r '.reason')
+          BRIEF=$(echo "$CONTENT" | jq -r '.brief')
+          DATE=$(date -u '+%b %d, %Y')
+
+          PAYLOAD=$(jq -n \
+            --arg date "$DATE" \
+            --arg brief "$BRIEF" \
+            --arg sp_price "$SP_PRICE" \
+            --arg sp_change "$SP_CHANGE" \
+            --arg sp_dir "$SP_DIR" \
+            --arg reason "$REASON" \
+            --arg jpm_price "$JPM_PRICE" \
+            --arg jpm_change "$JPM_CHANGE" \
+            --arg jpm_dir "$JPM_DIR" \
+            '{merge_variables: {
+              date: $date,
+              brief: $brief,
+              market_index_name: "S&P 500",
+              market_price: $sp_price,
+              market_change_pct: $sp_change,
+              market_direction: $sp_dir,
+              market_reason: $reason,
+              jpm_price: $jpm_price,
+              jpm_change_pct: $jpm_change,
+              jpm_direction: $jpm_dir
+            }}')
+
+          curl -s -X POST "$TRMNL_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD"
+          echo "Done!"

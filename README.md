@@ -8,6 +8,7 @@ A collection of community plugins for [TRMNL](https://usetrmnl.com) e-ink displa
 |--------|-------------|
 | [**GitHub Stars ⭐**](github-stars/) | Top 5 most starred repos on GitHub |
 | [**Agent Says 🤖**](agent-says/) | Daily AI agent quotes + priorities |
+| [**Market Brief 📈**](market-brief/) | Daily brief + S&P 500 status and JPM stock, with AI-written reason |
 
 ## How it works
 
