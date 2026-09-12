@@ -1,44 +1,65 @@
 <div style="font-family: sans-serif; padding: 24px 28px; background: #fff; color: #000; height: 480px; width: 800px; position: relative; overflow: hidden;">
 
   <!-- Header -->
-  <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; border-bottom: 3px solid #000; padding-bottom: 12px;">
+  <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; border-bottom: 3px solid #000; padding-bottom: 10px;">
     <div style="font-size: 26px; font-weight: 800; letter-spacing: -0.5px;">📈 Daily Brief</div>
     <div style="font-size: 11px; color: #666;">{{ date }}</div>
   </div>
 
   <!-- Brief message -->
-  <div style="font-size: 14px; line-height: 1.5; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px dashed #ccc;">
+  <div style="font-size: 13px; line-height: 1.4; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px dashed #ccc;">
     {{ brief }}
   </div>
 
-  <!-- Market row -->
-  <div style="display: flex; gap: 20px;">
+  <!-- Index row: S&P 500, Dow, Nasdaq, JPM -->
+  <div style="display: flex; gap: 12px; margin-bottom: 16px;">
 
-    <!-- S&P 500 -->
-    <div style="flex: 1; border: 2px solid #000; padding: 14px 16px;">
-      <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #666; margin-bottom: 6px;">
+    <div style="flex: 1; border: 2px solid #000; padding: 10px 12px;">
+      <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #666; margin-bottom: 4px;">
         {{ market_index_name | default: "S&P 500" }}
       </div>
-      <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px;">
-        <div style="font-size: 26px; font-weight: 800;">{{ market_price }}</div>
-        <div style="font-size: 15px; font-weight: 700;">
+      <div style="display: flex; align-items: baseline; gap: 6px;">
+        <div style="font-size: 20px; font-weight: 800;">{{ market_price }}</div>
+        <div style="font-size: 12px; font-weight: 700;">
           {% if market_direction == "up" %}▲{% elsif market_direction == "down" %}▼{% else %}▪{% endif %}
           {{ market_change_pct }}%
         </div>
       </div>
-      <div style="font-size: 12px; line-height: 1.4; color: #333;">
-        {{ market_reason }}
+    </div>
+
+    <div style="flex: 1; border: 2px solid #000; padding: 10px 12px;">
+      <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #666; margin-bottom: 4px;">
+        Dow Jones
+      </div>
+      <div style="display: flex; align-items: baseline; gap: 6px;">
+        <div style="font-size: 20px; font-weight: 800;">{{ dow_price }}</div>
+        <div style="font-size: 12px; font-weight: 700;">
+          {% if dow_direction == "up" %}▲{% elsif dow_direction == "down" %}▼{% else %}▪{% endif %}
+          {{ dow_change_pct }}%
+        </div>
       </div>
     </div>
 
-    <!-- JPM -->
-    <div style="width: 220px; border: 2px solid #000; padding: 14px 16px;">
-      <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #666; margin-bottom: 6px;">
-        JPMorgan (JPM)
+    <div style="flex: 1; border: 2px solid #000; padding: 10px 12px;">
+      <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #666; margin-bottom: 4px;">
+        Nasdaq
       </div>
-      <div style="display: flex; align-items: baseline; gap: 8px;">
-        <div style="font-size: 22px; font-weight: 800;">{{ jpm_price }}</div>
-        <div style="font-size: 13px; font-weight: 700;">
+      <div style="display: flex; align-items: baseline; gap: 6px;">
+        <div style="font-size: 20px; font-weight: 800;">{{ nasdaq_price }}</div>
+        <div style="font-size: 12px; font-weight: 700;">
+          {% if nasdaq_direction == "up" %}▲{% elsif nasdaq_direction == "down" %}▼{% else %}▪{% endif %}
+          {{ nasdaq_change_pct }}%
+        </div>
+      </div>
+    </div>
+
+    <div style="flex: 1; border: 2px solid #000; padding: 10px 12px;">
+      <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #666; margin-bottom: 4px;">
+        JPMorgan
+      </div>
+      <div style="display: flex; align-items: baseline; gap: 6px;">
+        <div style="font-size: 20px; font-weight: 800;">{{ jpm_price }}</div>
+        <div style="font-size: 12px; font-weight: 700;">
           {% if jpm_direction == "up" %}▲{% elsif jpm_direction == "down" %}▼{% else %}▪{% endif %}
           {{ jpm_change_pct }}%
         </div>
@@ -46,4 +67,11 @@
     </div>
 
   </div>
+
+  <!-- Reason headline -->
+  <div style="font-size: 12px; line-height: 1.5; color: #333; padding-top: 4px; border-top: 1px dashed #ccc;">
+    <span style="font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; color: #666;">Top story · </span>
+    {{ market_reason }}
+  </div>
+
 </div>

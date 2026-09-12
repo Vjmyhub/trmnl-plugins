@@ -8,7 +8,7 @@ A collection of community plugins for [TRMNL](https://usetrmnl.com) e-ink displa
 |--------|-------------|
 | [**GitHub Stars ⭐**](github-stars/) | Top 5 most starred repos on GitHub |
 | [**Agent Says 🤖**](agent-says/) | Daily AI agent quotes + priorities |
-| [**Market Brief 📈**](market-brief/) | S&P 500 + JPM stock status with real financial headlines, no API key needed |
+| [**Market Brief 📈**](market-brief/) | S&P 500, Dow, Nasdaq + JPM stock status with real financial headlines, no API key needed |
 
 ## How it works
 

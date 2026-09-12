@@ -13,52 +13,40 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Fetch S&P 500 quote
-        id: sp500
+      - name: Fetch market quotes
+        id: quotes
         run: |
           set +e
-          RESPONSE=$(curl -s -H "User-Agent: Mozilla/5.0" \
-            "https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?interval=1d&range=1d")
-          PRICE=$(echo "$RESPONSE" | jq -r '.chart.result[0].meta.regularMarketPrice // empty' 2>/dev/null)
-          PREV=$(echo "$RESPONSE" | jq -r '.chart.result[0].meta.chartPreviousClose // empty' 2>/dev/null)
 
-          if [ -z "$PRICE" ] || [ -z "$PREV" ]; then
-            echo "::warning::Failed to fetch S&P 500 quote — using fallback values"
-            PRICE="N/A"
-            CHANGE="0.00"
-            DIR="flat"
-          else
-            CHANGE=$(awk -v p="$PRICE" -v prev="$PREV" 'BEGIN{printf "%+.2f", ((p-prev)/prev)*100}')
-            DIR=$(awk -v p="$PRICE" -v prev="$PREV" 'BEGIN{ if (p>prev) print "up"; else if (p<prev) print "down"; else print "flat" }')
-          fi
+          fetch_quote() {
+            local symbol="$1"
+            local prefix="$2"
+            local response price prev change dir
 
-          echo "price=$PRICE" >> "$GITHUB_OUTPUT"
-          echo "prev=$PREV" >> "$GITHUB_OUTPUT"
-          echo "change=$CHANGE" >> "$GITHUB_OUTPUT"
-          echo "dir=$DIR" >> "$GITHUB_OUTPUT"
+            response=$(curl -s -H "User-Agent: Mozilla/5.0" \
+              "https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d")
+            price=$(echo "$response" | jq -r '.chart.result[0].meta.regularMarketPrice // empty' 2>/dev/null)
+            prev=$(echo "$response" | jq -r '.chart.result[0].meta.chartPreviousClose // empty' 2>/dev/null)
 
-      - name: Fetch JPM quote
-        id: jpm
-        run: |
-          set +e
-          RESPONSE=$(curl -s -H "User-Agent: Mozilla/5.0" \
-            "https://query1.finance.yahoo.com/v8/finance/chart/JPM?interval=1d&range=1d")
-          PRICE=$(echo "$RESPONSE" | jq -r '.chart.result[0].meta.regularMarketPrice // empty' 2>/dev/null)
-          PREV=$(echo "$RESPONSE" | jq -r '.chart.result[0].meta.chartPreviousClose // empty' 2>/dev/null)
+            if [ -z "$price" ] || [ -z "$prev" ]; then
+              echo "::warning::Failed to fetch $symbol quote — using fallback values"
+              price="N/A"
+              change="0.00"
+              dir="flat"
+            else
+              change=$(awk -v p="$price" -v prev="$prev" 'BEGIN{printf "%+.2f", ((p-prev)/prev)*100}')
+              dir=$(awk -v p="$price" -v prev="$prev" 'BEGIN{ if (p>prev) print "up"; else if (p<prev) print "down"; else print "flat" }')
+            fi
 
-          if [ -z "$PRICE" ] || [ -z "$PREV" ]; then
-            echo "::warning::Failed to fetch JPM quote — using fallback values"
-            PRICE="N/A"
-            CHANGE="0.00"
-            DIR="flat"
-          else
-            CHANGE=$(awk -v p="$PRICE" -v prev="$PREV" 'BEGIN{printf "%+.2f", ((p-prev)/prev)*100}')
-            DIR=$(awk -v p="$PRICE" -v prev="$PREV" 'BEGIN{ if (p>prev) print "up"; else if (p<prev) print "down"; else print "flat" }')
-          fi
+            echo "${prefix}_price=$price" >> "$GITHUB_OUTPUT"
+            echo "${prefix}_change=$change" >> "$GITHUB_OUTPUT"
+            echo "${prefix}_dir=$dir" >> "$GITHUB_OUTPUT"
+          }
 
-          echo "price=$PRICE" >> "$GITHUB_OUTPUT"
-          echo "change=$CHANGE" >> "$GITHUB_OUTPUT"
-          echo "dir=$DIR" >> "$GITHUB_OUTPUT"
+          fetch_quote "%5EGSPC" "sp500"
+          fetch_quote "%5EDJI" "dow"
+          fetch_quote "%5EIXIC" "nasdaq"
+          fetch_quote "JPM" "jpm"
 
       - name: Fetch market news headlines
         id: news
@@ -123,12 +111,18 @@ jobs:
       - name: Push to TRMNL
         env:
           TRMNL_WEBHOOK_URL: ${{ secrets.MARKET_BRIEF_WEBHOOK_URL }}
-          SP_PRICE: ${{ steps.sp500.outputs.price }}
-          SP_CHANGE: ${{ steps.sp500.outputs.change }}
-          SP_DIR: ${{ steps.sp500.outputs.dir }}
-          JPM_PRICE: ${{ steps.jpm.outputs.price }}
-          JPM_CHANGE: ${{ steps.jpm.outputs.change }}
-          JPM_DIR: ${{ steps.jpm.outputs.dir }}
+          SP_PRICE: ${{ steps.quotes.outputs.sp500_price }}
+          SP_CHANGE: ${{ steps.quotes.outputs.sp500_change }}
+          SP_DIR: ${{ steps.quotes.outputs.sp500_dir }}
+          DOW_PRICE: ${{ steps.quotes.outputs.dow_price }}
+          DOW_CHANGE: ${{ steps.quotes.outputs.dow_change }}
+          DOW_DIR: ${{ steps.quotes.outputs.dow_dir }}
+          NASDAQ_PRICE: ${{ steps.quotes.outputs.nasdaq_price }}
+          NASDAQ_CHANGE: ${{ steps.quotes.outputs.nasdaq_change }}
+          NASDAQ_DIR: ${{ steps.quotes.outputs.nasdaq_dir }}
+          JPM_PRICE: ${{ steps.quotes.outputs.jpm_price }}
+          JPM_CHANGE: ${{ steps.quotes.outputs.jpm_change }}
+          JPM_DIR: ${{ steps.quotes.outputs.jpm_dir }}
           REASON: ${{ steps.reason.outputs.reason }}
           BRIEF: ${{ steps.reason.outputs.brief }}
         run: |
@@ -142,6 +136,12 @@ jobs:
             --arg sp_change "$SP_CHANGE" \
             --arg sp_dir "$SP_DIR" \
             --arg reason "$REASON" \
+            --arg dow_price "$DOW_PRICE" \
+            --arg dow_change "$DOW_CHANGE" \
+            --arg dow_dir "$DOW_DIR" \
+            --arg nasdaq_price "$NASDAQ_PRICE" \
+            --arg nasdaq_change "$NASDAQ_CHANGE" \
+            --arg nasdaq_dir "$NASDAQ_DIR" \
             --arg jpm_price "$JPM_PRICE" \
             --arg jpm_change "$JPM_CHANGE" \
             --arg jpm_dir "$JPM_DIR" \
@@ -153,6 +153,12 @@ jobs:
               market_change_pct: $sp_change,
               market_direction: $sp_dir,
               market_reason: $reason,
+              dow_price: $dow_price,
+              dow_change_pct: $dow_change,
+              dow_direction: $dow_dir,
+              nasdaq_price: $nasdaq_price,
+              nasdaq_change_pct: $nasdaq_change,
+              nasdaq_direction: $nasdaq_dir,
               jpm_price: $jpm_price,
               jpm_change_pct: $jpm_change,
               jpm_direction: $jpm_dir

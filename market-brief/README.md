@@ -1,11 +1,11 @@
 # Market Brief 📈 — TRMNL Plugin
 
-Your daily briefing on one e-ink display: real financial headlines, S&P 500 status, and JPMorgan (JPM) stock — updated automatically after each US market close.
+Your daily briefing on one e-ink display: real financial headlines, S&P 500, Dow Jones, and Nasdaq status, and JPMorgan (JPM) stock — updated automatically after each US market close.
 
 ## How it works
 
 ```
-GitHub Action (scheduled) → fetches S&P 500 + JPM quotes + real news headlines → POSTs to TRMNL webhook → your e-ink display
+GitHub Action (scheduled) → fetches S&P 500 + Dow + Nasdaq + JPM quotes + real news headlines → POSTs to TRMNL webhook → your e-ink display
 ```
 
 No server needed, no API key, no billing — it runs entirely on free GitHub Actions and free RSS feeds. The two top real headlines of the day are shown verbatim (no AI paraphrasing).
@@ -40,10 +40,10 @@ The Action runs weekdays at 21:30 UTC (shortly after the 4:00pm ET US market clo
 
 ## What it shows
 
-- Today's top real financial headline as the "reason" line
 - A second real headline as the daily brief line
-- S&P 500: price, % change, direction
+- S&P 500, Dow Jones, and Nasdaq: price, % change, direction
 - JPMorgan (JPM): price, % change, direction
+- Today's top real financial headline as the "reason" line
 
 ## News sources
 
@@ -58,7 +58,7 @@ The first two headlines collected (in feed order) are used as-is — no AI is in
 
 Edit `.github/workflows/push-market-brief.yml` to change:
 - **Schedule**: modify the cron expression (`30 21 * * 1-5`)
-- **Tickers**: change `%5EGSPC` (S&P 500) or `JPM` in the Yahoo Finance URLs to track other indices/stocks
+- **Tickers**: the "Fetch market quotes" step calls `fetch_quote "<symbol>" "<prefix>"` once per instrument — add, remove, or swap tickers there (e.g. `fetch_quote "AAPL" "aapl"`), and add matching fields to the TRMNL payload and `template.liquid`
 - **News sources**: edit the `feeds` list in the "Fetch market news headlines" step
 - **AI-written summaries instead**: if you'd rather have an LLM summarize *why* the market moved instead of showing a raw headline, replace the "Pick reason + brief from real headlines" step with a call to the Claude API (requires an `ANTHROPIC_API_KEY` secret and a Console account with billing enabled) or another provider
 
