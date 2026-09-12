@@ -122,14 +122,17 @@ jobs:
 
           PAYLOAD=$(jq -n --arg prompt "$PROMPT" '{
             "messages": [{"role": "user", "content": $prompt}],
-            "model": "gpt-4o"
+            "model": "openai/gpt-4o"
           }')
 
           set +e
-          RESPONSE=$(curl -s https://models.inference.ai.azure.com/chat/completions \
+          HTTP_STATUS=$(curl -sS -o /tmp/models-response.json -w "%{http_code}" \
+            https://models.github.ai/inference/chat/completions \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD")
+            -d "$PAYLOAD" 2>/tmp/models-curl-error.log)
+          CURL_EXIT=$?
+          RESPONSE=$(cat /tmp/models-response.json 2>/dev/null)
 
           RAW_CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // empty' 2>/dev/null)
           CONTENT="{}"
@@ -143,8 +146,11 @@ jobs:
 
           if [ "$CONTENT" = "{}" ]; then
             echo "::warning::GitHub Models did not return usable content — falling back to placeholder reason/brief"
-            echo "::group::GitHub Models raw response (debug)"
+            echo "::group::GitHub Models debug (curl_exit=$CURL_EXIT http_status=$HTTP_STATUS)"
+            echo "--- response body ---"
             echo "$RESPONSE"
+            echo "--- curl stderr ---"
+            cat /tmp/models-curl-error.log 2>/dev/null
             echo "::endgroup::"
           fi
 
