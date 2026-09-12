@@ -1,16 +1,14 @@
 # Market Brief 📈 — TRMNL Plugin
 
-Your daily briefing on one e-ink display: a short AI-written note, S&P 500 status, why the market moved, and JPMorgan (JPM) stock — updated automatically after each US market close.
+Your daily briefing on one e-ink display: real financial headlines, S&P 500 status, and JPMorgan (JPM) stock — updated automatically after each US market close.
 
 ## How it works
 
 ```
-GitHub Action (scheduled) → fetches S&P 500 + JPM quotes + real news headlines → AI writes reason + brief → POSTs to TRMNL webhook → your e-ink display
+GitHub Action (scheduled) → fetches S&P 500 + JPM quotes + real news headlines → POSTs to TRMNL webhook → your e-ink display
 ```
 
-No server needed — it runs entirely on GitHub Actions using the Claude API to write the reason/brief text.
-
-> **Note:** this previously used free GitHub Models, but GitHub has retired that feature, so it now requires your own Anthropic API key (step 3 below). Usage is tiny — one short call per weekday — so cost should be a few cents a month at most.
+No server needed, no API key, no billing — it runs entirely on free GitHub Actions and free RSS feeds. The two top real headlines of the day are shown verbatim (no AI paraphrasing).
 
 ## Setup
 
@@ -27,14 +25,14 @@ No server needed — it runs entirely on GitHub Actions using the Claude API to 
 
 Fork it to your own GitHub account (keep it private if you prefer).
 
-### 3. Add two secrets
+### 3. Add the webhook secret
 
 1. Go to your fork → **Settings** → **Secrets and variables** → **Actions**
-2. Add:
-   - `MARKET_BRIEF_WEBHOOK_URL` — the TRMNL webhook URL from step 1
-   - `ANTHROPIC_API_KEY` — an API key from [console.anthropic.com](https://console.anthropic.com)
+2. Add a new secret:
+   - Name: `MARKET_BRIEF_WEBHOOK_URL`
+   - Value: your webhook URL from step 1
 
-> `MARKET_BRIEF_WEBHOOK_URL` uses a distinct name from the other plugins so you can run several private plugins from the same fork at once.
+> Uses a distinct secret name from the other plugins so you can run several private plugins from the same fork at once.
 
 ### 4. Enable the GitHub Action
 
@@ -42,8 +40,9 @@ The Action runs weekdays at 21:30 UTC (shortly after the 4:00pm ET US market clo
 
 ## What it shows
 
-- A short AI-written daily brief line
-- S&P 500: price, % change, direction, and a one-sentence reason for the move — grounded in real headlines from the day's financial news
+- Today's top real financial headline as the "reason" line
+- A second real headline as the daily brief line
+- S&P 500: price, % change, direction
 - JPMorgan (JPM): price, % change, direction
 
 ## News sources
@@ -53,7 +52,7 @@ Headlines are pulled from free, no-key-required RSS feeds:
 - Yahoo Finance News
 - CNBC Markets
 
-The AI step is given these headlines and asked to pick the most relevant one(s) to explain the day's move. If none of the pulled headlines are relevant, it falls back to a brief general explanation instead of forcing a connection.
+The first two headlines collected (in feed order) are used as-is — no AI is involved, so there's nothing to pay for or authenticate.
 
 ## Customization
 
@@ -61,11 +60,11 @@ Edit `.github/workflows/push-market-brief.yml` to change:
 - **Schedule**: modify the cron expression (`30 21 * * 1-5`)
 - **Tickers**: change `%5EGSPC` (S&P 500) or `JPM` in the Yahoo Finance URLs to track other indices/stocks
 - **News sources**: edit the `feeds` list in the "Fetch market news headlines" step
-- **AI model**: the "Generate brief + reason" step uses `claude-haiku-4-5-20251001` — change the `model` field in the step's payload to use a different Claude model
+- **AI-written summaries instead**: if you'd rather have an LLM summarize *why* the market moved instead of showing a raw headline, replace the "Pick reason + brief from real headlines" step with a call to the Claude API (requires an `ANTHROPIC_API_KEY` secret and a Console account with billing enabled) or another provider
 
 ## A note on the "reason"
 
-The reason is AI-summarized from real headlines pulled at run time, not independently fact-checked — treat it as a best-effort explanation grounded in the day's news, not a verified analysis.
+The reason and brief are real headlines shown exactly as published by the source feed — not analysis, not fact-checked, and not necessarily about *why* the market moved (they're simply the top items from that day's feed).
 
 ## License
 

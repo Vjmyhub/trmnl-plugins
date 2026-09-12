@@ -1,5 +1,5 @@
 name: Market Brief — Daily Push
-# Requires two repo secrets: MARKET_BRIEF_WEBHOOK_URL (TRMNL) and ANTHROPIC_API_KEY (Claude)
+# Requires one repo secret: MARKET_BRIEF_WEBHOOK_URL (TRMNL)
 
 on:
   workflow_dispatch:
@@ -97,67 +97,27 @@ jobs:
           cat headlines.json >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
-      - name: Generate brief + reason with Claude
-        id: ai
+      - name: Pick reason + brief from real headlines
+        id: reason
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          SP_PRICE: ${{ steps.sp500.outputs.price }}
-          SP_CHANGE: ${{ steps.sp500.outputs.change }}
-          SP_DIR: ${{ steps.sp500.outputs.dir }}
-          JPM_PRICE: ${{ steps.jpm.outputs.price }}
-          JPM_CHANGE: ${{ steps.jpm.outputs.change }}
-          JPM_DIR: ${{ steps.jpm.outputs.dir }}
           HEADLINES: ${{ steps.news.outputs.headlines }}
         run: |
-          HEADLINES_TEXT=$(echo "$HEADLINES" | jq -r 'if length > 0 then join("; ") else "" end')
-
-          PROMPT="Today the S&P 500 closed at $SP_PRICE, $SP_DIR $SP_CHANGE% from the previous close. JPMorgan (JPM) closed at $JPM_PRICE, $JPM_DIR $JPM_CHANGE%.
-
-          Today's financial news headlines: $HEADLINES_TEXT
-
-          Write:
-          1. A one-sentence reason the market moved this way today, grounded in the most relevant headline(s) above. If none of the headlines are clearly relevant, give a brief plausible general explanation instead and don't reference a headline.
-          2. A separate one-sentence general daily brief/context line (not about the market).
-          Respond in JSON only, no other text: {\"reason\": \"...\", \"brief\": \"...\"}"
-
-          PAYLOAD=$(jq -n --arg prompt "$PROMPT" '{
-            "model": "claude-haiku-4-5-20251001",
-            "max_tokens": 300,
-            "messages": [{"role": "user", "content": $prompt}]
-          }')
-
           set +e
-          HTTP_STATUS=$(curl -sS -o /tmp/claude-response.json -w "%{http_code}" \
-            https://api.anthropic.com/v1/messages \
-            -H "x-api-key: $ANTHROPIC_API_KEY" \
-            -H "anthropic-version: 2023-06-01" \
-            -H "Content-Type: application/json" \
-            -d "$PAYLOAD" 2>/tmp/claude-curl-error.log)
-          CURL_EXIT=$?
-          RESPONSE=$(cat /tmp/claude-response.json 2>/dev/null)
+          REASON=$(echo "$HEADLINES" | jq -r '.[0] // empty')
+          BRIEF=$(echo "$HEADLINES" | jq -r '.[1] // empty')
 
-          RAW_CONTENT=$(echo "$RESPONSE" | jq -r '.content[0].text // empty' 2>/dev/null)
-          CONTENT="{}"
-          if [ -n "$RAW_CONTENT" ]; then
-            CLEANED=$(echo "$RAW_CONTENT" | sed 's/```json//g; s/```//g')
-            PARSED=$(echo "$CLEANED" | jq -c '.' 2>/dev/null)
-            if [ -n "$PARSED" ] && [ "$PARSED" != "null" ]; then
-              CONTENT="$PARSED"
-            fi
+          if [ -z "$REASON" ]; then
+            REASON="No headlines available today — check the Action logs."
+          fi
+          if [ -z "$BRIEF" ]; then
+            BRIEF="Check the market for today's developments."
           fi
 
-          if [ "$CONTENT" = "{}" ]; then
-            echo "::warning::Claude did not return usable content — falling back to placeholder reason/brief"
-            echo "::group::Claude API debug (curl_exit=$CURL_EXIT http_status=$HTTP_STATUS)"
-            echo "--- response body ---"
-            echo "$RESPONSE"
-            echo "--- curl stderr ---"
-            cat /tmp/claude-curl-error.log 2>/dev/null
-            echo "::endgroup::"
-          fi
-
-          echo "content<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$CONTENT" >> "$GITHUB_OUTPUT"
+          echo "reason<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$REASON" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "brief<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$BRIEF" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: Push to TRMNL
@@ -169,19 +129,10 @@ jobs:
           JPM_PRICE: ${{ steps.jpm.outputs.price }}
           JPM_CHANGE: ${{ steps.jpm.outputs.change }}
           JPM_DIR: ${{ steps.jpm.outputs.dir }}
+          REASON: ${{ steps.reason.outputs.reason }}
+          BRIEF: ${{ steps.reason.outputs.brief }}
         run: |
           set +e
-          CONTENT='${{ steps.ai.outputs.content }}'
-          REASON=$(echo "$CONTENT" | jq -r '.reason // empty' 2>/dev/null)
-          BRIEF=$(echo "$CONTENT" | jq -r '.brief // empty' 2>/dev/null)
-
-          if [ -z "$REASON" ]; then
-            REASON="Reason unavailable today — check the Action logs."
-          fi
-          if [ -z "$BRIEF" ]; then
-            BRIEF="Daily brief unavailable today."
-          fi
-
           DATE=$(date -u '+%b %d, %Y')
 
           PAYLOAD=$(jq -n \
