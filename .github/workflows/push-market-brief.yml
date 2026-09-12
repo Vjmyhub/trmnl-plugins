@@ -143,6 +143,9 @@ jobs:
 
           if [ "$CONTENT" = "{}" ]; then
             echo "::warning::GitHub Models did not return usable content — falling back to placeholder reason/brief"
+            echo "::group::GitHub Models raw response (debug)"
+            echo "$RESPONSE"
+            echo "::endgroup::"
           fi
 
           echo "content<<EOF" >> "$GITHUB_OUTPUT"
