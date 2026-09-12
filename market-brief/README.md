@@ -8,7 +8,9 @@ Your daily briefing on one e-ink display: a short AI-written note, S&P 500 statu
 GitHub Action (scheduled) → fetches S&P 500 + JPM quotes + real news headlines → AI writes reason + brief → POSTs to TRMNL webhook → your e-ink display
 ```
 
-No server needed — it runs entirely on GitHub Actions using free GitHub Models (no external API key required).
+No server needed — it runs entirely on GitHub Actions using the Claude API to write the reason/brief text.
+
+> **Note:** this previously used free GitHub Models, but GitHub has retired that feature, so it now requires your own Anthropic API key (step 3 below). Usage is tiny — one short call per weekday — so cost should be a few cents a month at most.
 
 ## Setup
 
@@ -25,14 +27,14 @@ No server needed — it runs entirely on GitHub Actions using free GitHub Models
 
 Fork it to your own GitHub account (keep it private if you prefer).
 
-### 3. Add your webhook URL as a secret
+### 3. Add two secrets
 
 1. Go to your fork → **Settings** → **Secrets and variables** → **Actions**
-2. Add a new secret:
-   - Name: `MARKET_BRIEF_WEBHOOK_URL`
-   - Value: your webhook URL from step 1
+2. Add:
+   - `MARKET_BRIEF_WEBHOOK_URL` — the TRMNL webhook URL from step 1
+   - `ANTHROPIC_API_KEY` — an API key from [console.anthropic.com](https://console.anthropic.com)
 
-> Uses a distinct secret name from the other plugins so you can run several private plugins from the same fork at once.
+> `MARKET_BRIEF_WEBHOOK_URL` uses a distinct name from the other plugins so you can run several private plugins from the same fork at once.
 
 ### 4. Enable the GitHub Action
 
@@ -59,7 +61,7 @@ Edit `.github/workflows/push-market-brief.yml` to change:
 - **Schedule**: modify the cron expression (`30 21 * * 1-5`)
 - **Tickers**: change `%5EGSPC` (S&P 500) or `JPM` in the Yahoo Finance URLs to track other indices/stocks
 - **News sources**: edit the `feeds` list in the "Fetch market news headlines" step
-- **AI model**: the "Generate brief + reason" step uses GitHub Models (`gpt-4o`) with your repo's built-in `GITHUB_TOKEN` — swap in the Claude/Anthropic API instead if you'd prefer (requires adding an `ANTHROPIC_API_KEY` secret)
+- **AI model**: the "Generate brief + reason" step uses `claude-haiku-4-5-20251001` — change the `model` field in the step's payload to use a different Claude model
 
 ## A note on the "reason"
 
