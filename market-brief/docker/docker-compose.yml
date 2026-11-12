@@ -3,6 +3,7 @@ services:
     build: .
     container_name: market-brief
     restart: unless-stopped
+    init: true
     environment:
       - MARKET_BRIEF_WEBHOOK_URL=${MARKET_BRIEF_WEBHOOK_URL:?set this in .env}
     volumes:
