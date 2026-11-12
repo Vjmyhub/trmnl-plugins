@@ -124,15 +124,14 @@ jobs:
           BRIEF=$(echo "$HEADLINES" | jq -r '.[0] // empty')
           WHY1=$(echo "$HEADLINES" | jq -r '.[1] // empty')
           WHY2=$(echo "$HEADLINES" | jq -r '.[2] // empty')
+          WHY3=$(echo "$HEADLINES" | jq -r '.[3] // empty')
+          WHY4=$(echo "$HEADLINES" | jq -r '.[4] // empty')
 
           if [ -z "$BRIEF" ]; then
             BRIEF="No headlines available today — check the Action logs."
           fi
           if [ -z "$WHY1" ]; then
             WHY1="Check the market for today's developments."
-          fi
-          if [ -z "$WHY2" ]; then
-            WHY2=""
           fi
 
           echo "brief<<EOF" >> "$GITHUB_OUTPUT"
@@ -143,6 +142,12 @@ jobs:
           echo "EOF" >> "$GITHUB_OUTPUT"
           echo "why2<<EOF" >> "$GITHUB_OUTPUT"
           echo "$WHY2" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "why3<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$WHY3" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "why4<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$WHY4" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: Push to TRMNL
@@ -172,17 +177,34 @@ jobs:
           BRIEF: ${{ steps.reason.outputs.brief }}
           WHY1: ${{ steps.reason.outputs.why1 }}
           WHY2: ${{ steps.reason.outputs.why2 }}
+          WHY3: ${{ steps.reason.outputs.why3 }}
+          WHY4: ${{ steps.reason.outputs.why4 }}
         run: |
           set +e
           DATE=$(date -u '+%b %d, %Y')
           TRENDING_TEXT=$(echo "$TRENDING" | jq -r 'if length > 0 then join(", ") else "No standout movers today" end' 2>/dev/null)
+
+          if [ "$SP_DIR" = "up" ] && [ "$SP_WEEK_DIR" = "up" ]; then
+            TREND_SUMMARY="📈 S&P 500 is climbing — up today and up this week."
+          elif [ "$SP_DIR" = "up" ] && [ "$SP_WEEK_DIR" = "down" ]; then
+            TREND_SUMMARY="📈 S&P 500 bounced today after a down week."
+          elif [ "$SP_DIR" = "down" ] && [ "$SP_WEEK_DIR" = "up" ]; then
+            TREND_SUMMARY="📉 S&P 500 dipped today despite a stronger week."
+          elif [ "$SP_DIR" = "down" ] && [ "$SP_WEEK_DIR" = "down" ]; then
+            TREND_SUMMARY="📉 S&P 500 is sliding — down today and down this week."
+          else
+            TREND_SUMMARY="S&P 500 is roughly flat today and this week."
+          fi
 
           PAYLOAD=$(jq -n \
             --arg date "$DATE" \
             --arg brief "$BRIEF" \
             --arg why1 "$WHY1" \
             --arg why2 "$WHY2" \
+            --arg why3 "$WHY3" \
+            --arg why4 "$WHY4" \
             --arg trending "$TRENDING_TEXT" \
+            --arg trend_summary "$TREND_SUMMARY" \
             --arg sp_price "$SP_PRICE" \
             --arg sp_change "$SP_CHANGE" \
             --arg sp_dir "$SP_DIR" \
@@ -208,7 +230,10 @@ jobs:
               brief: $brief,
               why1: $why1,
               why2: $why2,
+              why3: $why3,
+              why4: $why4,
               trending: $trending,
+              trend_summary: $trend_summary,
               market_index_name: "S&P 500",
               market_price: $sp_price,
               market_change_pct: $sp_change,

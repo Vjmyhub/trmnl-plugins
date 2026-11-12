@@ -43,7 +43,8 @@ The Action runs weekdays at 21:30 UTC (shortly after the 4:00pm ET US market clo
 ## What it shows
 
 - **Trend**: S&P 500, Dow Jones, Nasdaq, and JPMorgan (JPM) — each with both 1-day and 5-day (trading week) price, % change, and direction
-- **Why it's trending**: two real headlines pulled from financial news feeds, shown as-is
+- **Trend summary**: a rule-based one-line read on the S&P 500 (e.g. "bounced today after a down week") computed from the real 1-day vs. 5-day direction — not AI-generated, just plain comparison logic
+- **Market news**: up to four real headlines pulled from financial news feeds, shown as-is
 - **Trending today**: the top stocks currently trending in search/interest (via Yahoo Finance's public trending list) — informational context on what's getting attention, not a recommendation to buy or sell anything
 - A top headline as the daily brief line
 
@@ -65,9 +66,9 @@ Edit `.github/workflows/push-market-brief.yml` to change:
 - **News sources**: edit the `feeds` list in the "Fetch market news headlines" step
 - **AI-written summaries instead**: if you'd rather have an LLM summarize *why* the market moved instead of showing a raw headline, replace the "Pick reason + brief from real headlines" step with a call to the Claude API (requires an `ANTHROPIC_API_KEY` secret and a Console account with billing enabled) or another provider
 
-## A note on "why it's trending" and "trending today"
+## A note on "market news" and "trending today"
 
-These are real headlines and a real trending-tickers list shown verbatim — not analysis, not fact-checked, and not personalized financial advice. "Trending today" reflects what's getting search/news attention, not a buy/sell signal; treat everything here as context to notice, not instructions to act on.
+These are real headlines and a real trending-tickers list shown verbatim — not analysis, not fact-checked, and not personalized financial advice. The trend summary is plain comparison logic on real numbers (1-day direction vs. 5-day direction), not an AI-generated opinion. "Trending today" reflects what's getting search/news attention, not a buy/sell signal; treat everything here as context to notice, not instructions to act on.
 
 ## License
 
