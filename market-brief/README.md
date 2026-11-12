@@ -43,9 +43,9 @@ The Action runs weekdays at 21:30 UTC (shortly after the 4:00pm ET US market clo
 ## What it shows
 
 - **Trend**: S&P 500, Dow Jones, Nasdaq, and JPMorgan (JPM) — each with both 1-day and 5-day (trading week) price, % change, and direction
-- **Trend summary**: a rule-based one-line read on the S&P 500 (e.g. "bounced today after a down week") computed from the real 1-day vs. 5-day direction — not AI-generated, just plain comparison logic
+- **Trend summary**: a rule-based one-line read for *each* of the 4 instruments (e.g. "Dow Jones dipped today despite a stronger week") computed from the real 1-day vs. 5-day direction — not AI-generated, just plain comparison logic
 - **Market news**: up to four real headlines pulled from financial news feeds, shown as-is
-- **Trending today**: the top stocks currently trending in search/interest (via Yahoo Finance's public trending list) — informational context on what's getting attention, not a recommendation to buy or sell anything
+- **Trending today**: the top stocks currently trending in search/interest (via Yahoo Finance's public trending list), each shown with its real 1-day % change — informational context on what's getting attention, not a recommendation to buy or sell anything
 - A top headline as the daily brief line
 
 ## News & data sources

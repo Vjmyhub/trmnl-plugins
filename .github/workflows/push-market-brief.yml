@@ -74,8 +74,26 @@ jobs:
             TICKERS="[]"
           fi
 
+          MOVERS="[]"
+          if [ "$TICKERS" != "[]" ]; then
+            MOVER_LIST=()
+            for symbol in $(echo "$TICKERS" | jq -r '.[]'); do
+              QRESP=$(curl -s -H "User-Agent: Mozilla/5.0" \
+                "https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d")
+              QPRICE=$(echo "$QRESP" | jq -r '.chart.result[0].meta.regularMarketPrice // empty' 2>/dev/null)
+              QPREV=$(echo "$QRESP" | jq -r '.chart.result[0].meta.chartPreviousClose // empty' 2>/dev/null)
+              if [ -n "$QPRICE" ] && [ -n "$QPREV" ]; then
+                QCHANGE=$(awk -v p="$QPRICE" -v prev="$QPREV" 'BEGIN{printf "%+.1f", ((p-prev)/prev)*100}')
+                MOVER_LIST+=("${symbol} ${QCHANGE}%")
+              else
+                MOVER_LIST+=("${symbol}")
+              fi
+            done
+            MOVERS=$(printf '%s\n' "${MOVER_LIST[@]}" | jq -R . | jq -cs .)
+          fi
+
           echo "tickers<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$TICKERS" >> "$GITHUB_OUTPUT"
+          echo "$MOVERS" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: Fetch market news headlines
@@ -182,19 +200,27 @@ jobs:
         run: |
           set +e
           DATE=$(date -u '+%b %d, %Y')
-          TRENDING_TEXT=$(echo "$TRENDING" | jq -r 'if length > 0 then join(", ") else "No standout movers today" end' 2>/dev/null)
+          TRENDING_TEXT=$(echo "$TRENDING" | jq -r 'if length > 0 then join(" · ") else "No standout movers today" end' 2>/dev/null)
 
-          if [ "$SP_DIR" = "up" ] && [ "$SP_WEEK_DIR" = "up" ]; then
-            TREND_SUMMARY="📈 S&P 500 is climbing — up today and up this week."
-          elif [ "$SP_DIR" = "up" ] && [ "$SP_WEEK_DIR" = "down" ]; then
-            TREND_SUMMARY="📈 S&P 500 bounced today after a down week."
-          elif [ "$SP_DIR" = "down" ] && [ "$SP_WEEK_DIR" = "up" ]; then
-            TREND_SUMMARY="📉 S&P 500 dipped today despite a stronger week."
-          elif [ "$SP_DIR" = "down" ] && [ "$SP_WEEK_DIR" = "down" ]; then
-            TREND_SUMMARY="📉 S&P 500 is sliding — down today and down this week."
-          else
-            TREND_SUMMARY="S&P 500 is roughly flat today and this week."
-          fi
+          trend_line() {
+            local name="$1" dir="$2" week_dir="$3"
+            if [ "$dir" = "up" ] && [ "$week_dir" = "up" ]; then
+              echo "📈 ${name} is climbing — up today and up this week."
+            elif [ "$dir" = "up" ] && [ "$week_dir" = "down" ]; then
+              echo "📈 ${name} bounced today after a down week."
+            elif [ "$dir" = "down" ] && [ "$week_dir" = "up" ]; then
+              echo "📉 ${name} dipped today despite a stronger week."
+            elif [ "$dir" = "down" ] && [ "$week_dir" = "down" ]; then
+              echo "📉 ${name} is sliding — down today and down this week."
+            else
+              echo "▪ ${name} is roughly flat today and this week."
+            fi
+          }
+
+          SP_TREND=$(trend_line "S&P 500" "$SP_DIR" "$SP_WEEK_DIR")
+          DOW_TREND=$(trend_line "Dow Jones" "$DOW_DIR" "$DOW_WEEK_DIR")
+          NASDAQ_TREND=$(trend_line "Nasdaq" "$NASDAQ_DIR" "$NASDAQ_WEEK_DIR")
+          JPM_TREND=$(trend_line "JPMorgan" "$JPM_DIR" "$JPM_WEEK_DIR")
 
           PAYLOAD=$(jq -n \
             --arg date "$DATE" \
@@ -204,7 +230,10 @@ jobs:
             --arg why3 "$WHY3" \
             --arg why4 "$WHY4" \
             --arg trending "$TRENDING_TEXT" \
-            --arg trend_summary "$TREND_SUMMARY" \
+            --arg sp_trend "$SP_TREND" \
+            --arg dow_trend "$DOW_TREND" \
+            --arg nasdaq_trend "$NASDAQ_TREND" \
+            --arg jpm_trend "$JPM_TREND" \
             --arg sp_price "$SP_PRICE" \
             --arg sp_change "$SP_CHANGE" \
             --arg sp_dir "$SP_DIR" \
@@ -233,7 +262,10 @@ jobs:
               why3: $why3,
               why4: $why4,
               trending: $trending,
-              trend_summary: $trend_summary,
+              sp_trend: $sp_trend,
+              dow_trend: $dow_trend,
+              nasdaq_trend: $nasdaq_trend,
+              jpm_trend: $jpm_trend,
               market_index_name: "S&P 500",
               market_price: $sp_price,
               market_change_pct: $sp_change,
