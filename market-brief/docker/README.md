@@ -21,29 +21,37 @@ entirely on your own hardware.
 - `crontab` — runs the script 3x/weekday: 9:45am, 12:30pm, 4:30pm ET
 - `entrypoint.sh` — works around a Docker+cron gotcha (see below)
 - `docker-compose.yml` — the easiest way to build and run it
-- `.env.example` — copy to `.env` and fill in your real webhook URL
+- `deploy.sh` — one-shot script that checks prerequisites, sets up `.env` interactively, builds, starts, and offers an immediate test run
+- `.env.example` — copy to `.env` and fill in your real webhook URL (or let `deploy.sh` create it for you)
 
 ## Deploy on your Pi
 
 These commands run **on the Pi itself** (over SSH) — I can't reach a
-private/local IP like `10.x.x.x` from this session, so this part is on you:
+private/local IP like `10.x.x.x` from this session, so this part is on you.
+
+### Easiest: `deploy.sh`
 
 ```bash
 # 1. Get these files onto the Pi, e.g.:
 scp -r market-brief/docker/ pi@10.242.1.43:~/market-brief-docker
 
-# 2. SSH in
+# 2. SSH in and run the deploy script
 ssh pi@10.242.1.43
 cd ~/market-brief-docker
+./deploy.sh
+```
 
-# 3. Set your real webhook URL
+It will: check Docker is installed and running, prompt you for your TRMNL
+webhook URL if `.env` doesn't exist yet, build and start the container,
+show its status, and offer to run the script once immediately so you don't
+have to wait for the next scheduled time to see if it worked.
+
+### Manual equivalent, if you'd rather run each step yourself
+
+```bash
 cp .env.example .env
 nano .env   # paste your real MARKET_BRIEF_WEBHOOK_URL
-
-# 4. Build and run
 docker compose up -d --build
-
-# 5. Check it's running and see logs
 docker compose ps
 docker compose logs -f
 ```
@@ -61,7 +69,8 @@ docker compose exec market-brief sh -c '. /app/env.sh; /app/push-market-brief.sh
 
 ```bash
 # back on the Pi, after re-copying the updated files:
-docker compose up -d --build
+./deploy.sh
+# (or: docker compose up -d --build)
 ```
 
 ## The Docker+cron environment-variable gotcha
@@ -79,15 +88,16 @@ pattern in `entrypoint.sh` too.
 
 I ran the standalone script directly (bash/curl/jq already available in my
 environment) and confirmed its control flow and fallback behavior are
-correct, and reviewed the Dockerfile/crontab/entrypoint for correctness.
-I could **not** fully build and run the container end-to-end myself —
-my environment's network policy blocks Alpine's package CDN, so `apk add`
-fails here specifically. Your Pi will have normal internet access and
-should build fine, but this means the first `docker compose up -d --build`
-on your Pi is the real first full test — watch `docker compose logs -f`
-and confirm the device actually updates in the next few minutes rather than
-waiting for the next scheduled time (use the "Test it immediately" command
-above).
+correct, reviewed the Dockerfile/crontab/entrypoint for correctness, and
+ran `deploy.sh` itself end-to-end — its prerequisite checks, `.env`
+handling, and error propagation all behave correctly. I could **not**
+fully build and run the container itself — my environment's network
+policy blocks Alpine's package CDN, so `apk add` fails here specifically
+(confirmed via a real `docker build`, not a guess). Your Pi will have
+normal internet access and should get past this fine, but that means your
+run of `./deploy.sh` is the real first full test — it'll offer to run the
+script once immediately so you can confirm the device updates right away
+instead of waiting for the next scheduled time.
 
 ## Running both GitHub Actions and this Docker setup at once?
 
