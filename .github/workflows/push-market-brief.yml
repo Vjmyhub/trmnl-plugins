@@ -4,6 +4,10 @@ name: Market Brief — Daily Push
 on:
   workflow_dispatch:
   schedule:
+    # 14:45 UTC, Mon-Fri — shortly after US market open (9:30am ET)
+    - cron: '45 14 * * 1-5'
+    # 17:30 UTC, Mon-Fri — midday
+    - cron: '30 17 * * 1-5'
     # 21:30 UTC, Mon-Fri — after US market close (4:00pm ET)
     - cron: '30 21 * * 1-5'
 
@@ -101,6 +105,7 @@ jobs:
         run: |
           python3 <<'PY' > headlines.json
           import json
+          import re
           import urllib.request
           import xml.etree.ElementTree as ET
 
@@ -110,7 +115,19 @@ jobs:
               "https://www.cnbc.com/id/20910258/device/rss/rss.html",
           ]
 
+          def clean_html(text):
+              text = re.sub(r'<[^>]+>', '', text)
+              text = (text.replace('&nbsp;', ' ').replace('&amp;', '&')
+                          .replace('&#39;', "'").replace('&quot;', '"'))
+              return re.sub(r'\s+', ' ', text).strip()
+
+          def truncate(text, limit=160):
+              if len(text) <= limit:
+                  return text
+              return text[:limit].rsplit(' ', 1)[0] + '...'
+
           headlines = []
+          seen_titles = set()
           for url in feeds:
               try:
                   req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
@@ -119,10 +136,18 @@ jobs:
                   root = ET.fromstring(data)
                   for item in root.iter("item"):
                       title_el = item.find("title")
+                      desc_el = item.find("description")
                       if title_el is not None and title_el.text:
                           title = title_el.text.strip()
-                          if title and title not in headlines:
-                              headlines.append(title)
+                          if not title or title in seen_titles:
+                              continue
+                          description = ""
+                          if desc_el is not None and desc_el.text:
+                              cleaned = clean_html(desc_el.text)
+                              if cleaned and cleaned != title:
+                                  description = truncate(cleaned)
+                          seen_titles.add(title)
+                          headlines.append({"title": title, "description": description})
               except Exception:
                   continue
 
@@ -139,11 +164,13 @@ jobs:
           HEADLINES: ${{ steps.news.outputs.headlines }}
         run: |
           set +e
-          BRIEF=$(echo "$HEADLINES" | jq -r '.[0] // empty')
-          WHY1=$(echo "$HEADLINES" | jq -r '.[1] // empty')
-          WHY2=$(echo "$HEADLINES" | jq -r '.[2] // empty')
-          WHY3=$(echo "$HEADLINES" | jq -r '.[3] // empty')
-          WHY4=$(echo "$HEADLINES" | jq -r '.[4] // empty')
+          BRIEF=$(echo "$HEADLINES" | jq -r '.[0].title // empty')
+          WHY1=$(echo "$HEADLINES" | jq -r '.[1].title // empty')
+          WHY1_DESC=$(echo "$HEADLINES" | jq -r '.[1].description // empty')
+          WHY2=$(echo "$HEADLINES" | jq -r '.[2].title // empty')
+          WHY2_DESC=$(echo "$HEADLINES" | jq -r '.[2].description // empty')
+          WHY3=$(echo "$HEADLINES" | jq -r '.[3].title // empty')
+          WHY4=$(echo "$HEADLINES" | jq -r '.[4].title // empty')
 
           if [ -z "$BRIEF" ]; then
             BRIEF="No headlines available today — check the Action logs."
@@ -158,8 +185,14 @@ jobs:
           echo "why1<<EOF" >> "$GITHUB_OUTPUT"
           echo "$WHY1" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "why1_desc<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$WHY1_DESC" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
           echo "why2<<EOF" >> "$GITHUB_OUTPUT"
           echo "$WHY2" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "why2_desc<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$WHY2_DESC" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
           echo "why3<<EOF" >> "$GITHUB_OUTPUT"
           echo "$WHY3" >> "$GITHUB_OUTPUT"
@@ -194,12 +227,23 @@ jobs:
           TRENDING: ${{ steps.trending.outputs.tickers }}
           BRIEF: ${{ steps.reason.outputs.brief }}
           WHY1: ${{ steps.reason.outputs.why1 }}
+          WHY1_DESC: ${{ steps.reason.outputs.why1_desc }}
           WHY2: ${{ steps.reason.outputs.why2 }}
+          WHY2_DESC: ${{ steps.reason.outputs.why2_desc }}
           WHY3: ${{ steps.reason.outputs.why3 }}
           WHY4: ${{ steps.reason.outputs.why4 }}
         run: |
           set +e
           DATE=$(date -u '+%b %d, %Y')
+          TIME=$(date -u '+%I:%M %p UTC')
+          UTC_HOUR=$(date -u '+%H')
+          if [ "$UTC_HOUR" -lt 16 ]; then
+            PERIOD="Market Open"
+          elif [ "$UTC_HOUR" -lt 19 ]; then
+            PERIOD="Midday"
+          else
+            PERIOD="Market Close"
+          fi
           TRENDING_TEXT=$(echo "$TRENDING" | jq -r 'if length > 0 then join(" · ") else "No standout movers today" end' 2>/dev/null)
 
           trend_line() {
@@ -224,9 +268,13 @@ jobs:
 
           PAYLOAD=$(jq -n \
             --arg date "$DATE" \
+            --arg time "$TIME" \
+            --arg period "$PERIOD" \
             --arg brief "$BRIEF" \
             --arg why1 "$WHY1" \
+            --arg why1_desc "$WHY1_DESC" \
             --arg why2 "$WHY2" \
+            --arg why2_desc "$WHY2_DESC" \
             --arg why3 "$WHY3" \
             --arg why4 "$WHY4" \
             --arg trending "$TRENDING_TEXT" \
@@ -256,9 +304,13 @@ jobs:
             --arg jpm_week_dir "$JPM_WEEK_DIR" \
             '{merge_variables: {
               date: $date,
+              time: $time,
+              period: $period,
               brief: $brief,
               why1: $why1,
+              why1_desc: $why1_desc,
               why2: $why2,
+              why2_desc: $why2_desc,
               why3: $why3,
               why4: $why4,
               trending: $trending,

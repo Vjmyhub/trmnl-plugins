@@ -2,8 +2,8 @@
 
   <!-- Header -->
   <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; border-bottom: 3px solid #000; padding-bottom: 6px;">
-    <div style="font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">📈 Daily Brief</div>
-    <div style="font-size: 11px; color: #666;">{{ date }}</div>
+    <div style="font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">📈 Daily Brief <span style="font-size: 13px; font-weight: 700; color: #666;">· {{ period | default: "Update" }}</span></div>
+    <div style="font-size: 11px; color: #666; text-align: right;">{{ date }}<br>{{ time }}</div>
   </div>
 
   <!-- Brief message -->
@@ -95,8 +95,10 @@
   <!-- Market news -->
   <div style="font-size: 11px; line-height: 1.3; color: #333; padding: 7px 0; border-top: 1px dashed #ccc;">
     <div style="font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; color: #666; margin-bottom: 3px;">Market news</div>
-    <div style="margin-bottom: 2px;">• {{ why1 }}</div>
-    {% if why2 and why2 != "" %}<div style="margin-bottom: 2px;">• {{ why2 }}</div>{% endif %}
+    <div style="margin-bottom: 1px;">• {{ why1 }}</div>
+    {% if why1_desc and why1_desc != "" %}<div style="color: #666; margin: 0 0 3px 10px;">{{ why1_desc }}</div>{% endif %}
+    {% if why2 and why2 != "" %}<div style="margin-bottom: 1px;">• {{ why2 }}</div>{% endif %}
+    {% if why2_desc and why2_desc != "" %}<div style="color: #666; margin: 0 0 3px 10px;">{{ why2_desc }}</div>{% endif %}
     {% if why3 and why3 != "" %}<div style="margin-bottom: 2px;">• {{ why3 }}</div>{% endif %}
     {% if why4 and why4 != "" %}<div>• {{ why4 }}</div>{% endif %}
   </div>
