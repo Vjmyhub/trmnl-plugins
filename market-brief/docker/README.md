@@ -24,6 +24,13 @@ entirely on your own hardware.
 - `deploy.sh` — one-shot script that checks prerequisites, sets up `.env` interactively, builds, starts, and offers an immediate test run
 - `.env.example` — copy to `.env` and fill in your real webhook URL (or let `deploy.sh` create it for you)
 
+> **If you copy these files from a Windows machine** (including via WinSCP's
+> "text" transfer mode, or a `git clone` with `core.autocrlf=true`), the
+> shell scripts can pick up CRLF line endings, which breaks their
+> `#!/usr/bin/env bash` shebang with an error like `bash\r: No such file or
+> directory`. Fix on the target machine with:
+> `sed -i 's/\r$//' deploy.sh push-market-brief.sh entrypoint.sh crontab`
+
 ## Deploy on your Pi
 
 These commands run **on the Pi itself** (over SSH) — I can't reach a
@@ -84,20 +91,15 @@ which the crontab sources (`. /app/env.sh;`) before running the script each
 time. If you add more env vars the script needs, add them to the `grep -E`
 pattern in `entrypoint.sh` too.
 
-## Verified vs. not yet verified
+## Status: verified working on a Raspberry Pi
 
-I ran the standalone script directly (bash/curl/jq already available in my
-environment) and confirmed its control flow and fallback behavior are
-correct, reviewed the Dockerfile/crontab/entrypoint for correctness, and
-ran `deploy.sh` itself end-to-end — its prerequisite checks, `.env`
-handling, and error propagation all behave correctly. I could **not**
-fully build and run the container itself — my environment's network
-policy blocks Alpine's package CDN, so `apk add` fails here specifically
-(confirmed via a real `docker build`, not a guess). Your Pi will have
-normal internet access and should get past this fine, but that means your
-run of `./deploy.sh` is the real first full test — it'll offer to run the
-script once immediately so you can confirm the device updates right away
-instead of waiting for the next scheduled time.
+This has been deployed and tested end-to-end on a real Raspberry Pi: built
+successfully, started cleanly (after fixing an initial `crond`-as-PID-1
+crash loop — see `docker-compose.yml`'s `init: true`), and a manual test
+run successfully fetched live quotes, trending tickers, and headlines, then
+pushed to TRMNL with HTTP 200. The scheduled cron times have not yet fired
+on their own (that just needs time to pass), but the script itself is
+confirmed working in this environment.
 
 ## Running both GitHub Actions and this Docker setup at once?
 
