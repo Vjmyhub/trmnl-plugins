@@ -10,6 +10,8 @@ GitHub Action (3x/weekday) → fetches S&P 500 + Dow + Nasdaq + JPM quotes (1D +
 
 No server needed, no API key, no billing — it runs entirely on free GitHub Actions, free Yahoo Finance endpoints, and free RSS feeds. All text shown (headlines, trending tickers) is real data shown verbatim — no AI paraphrasing or synthesis.
 
+> **Prefer to run this yourself instead of on GitHub Actions** (e.g. on a Raspberry Pi)? See [`docker/README.md`](docker/) for a Docker + cron version of this same logic — useful if you want it independent of GitHub entirely, including immune to GitHub's 60-day inactivity auto-disable.
+
 ## Setup
 
 ### 1. Create a Private Plugin on TRMNL

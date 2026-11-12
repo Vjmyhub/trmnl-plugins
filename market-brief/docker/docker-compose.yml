@@ -1,0 +1,9 @@
+services:
+  market-brief:
+    build: .
+    container_name: market-brief
+    restart: unless-stopped
+    environment:
+      - MARKET_BRIEF_WEBHOOK_URL=${MARKET_BRIEF_WEBHOOK_URL:?set this in .env}
+    volumes:
+      - ./logs:/var/log

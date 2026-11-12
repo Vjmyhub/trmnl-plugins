@@ -1,0 +1,10 @@
+# busybox crond crontab — times are in the container's local timezone
+# (America/New_York, set in the Dockerfile), so this automatically
+# accounts for Daylight Saving — no manual UTC-offset math needed.
+#
+# 9:45am ET, Mon-Fri — shortly after US market open (9:30am ET)
+45 9 * * 1-5 . /app/env.sh; /app/push-market-brief.sh >> /var/log/market-brief.log 2>&1
+# 12:30pm ET, Mon-Fri — midday
+30 12 * * 1-5 . /app/env.sh; /app/push-market-brief.sh >> /var/log/market-brief.log 2>&1
+# 4:30pm ET, Mon-Fri — after US market close (4:00pm ET)
+30 16 * * 1-5 . /app/env.sh; /app/push-market-brief.sh >> /var/log/market-brief.log 2>&1
